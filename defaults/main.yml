@@ -1,0 +1,39 @@
+---
+# --- Credentials (no defaults — must be supplied, ideally via vault) ---------
+# mysql_root_password   (required) password for the MySQL root@localhost account
+# mysql_remote_username (optional) name of a remote-capable account to create
+# mysql_remote_pass     (optional) password for that account
+
+# --- Secure installation -----------------------------------------------------
+# Remove anonymous users, hostname root accounts, and the test database.
+mysql_manage_secure_installation: true
+
+# --- Remote access -----------------------------------------------------------
+# SECURE BY DEFAULT: the server binds to localhost only and no remote account
+# is created. Set mysql_enable_remote_network_access: true (and provide remote
+# credentials) to expose MySQL on the network. Only do this behind a trusted
+# network boundary / firewall.
+mysql_enable_remote_network_access: false
+mysql_bind_address: "127.0.0.1"
+mysqlx_bind_address: "127.0.0.1"
+mysql_port: 3306
+
+# Create the remote account defined by mysql_remote_username/mysql_remote_pass.
+mysql_manage_remote_user: true
+# Host pattern the remote account may connect from ("%" = any host).
+mysql_remote_user_host: "%"
+# Privileges granted to the remote account (community.mysql priv syntax).
+mysql_remote_user_priv: "*.*:ALL,GRANT"
+
+# --- Data directory ----------------------------------------------------------
+mysql_datadir_move: false
+
+# --- OS-specific package / path defaults -------------------------------------
+mysql_server_package_debian: "mysql-server"
+mysql_python_package_debian: "python3-pymysql"
+mysql_service_name_debian: "mysql"
+mysql_service_name_redhat: "mysqld"
+mysql_socket_debian: "/var/run/mysqld/mysqld.sock"
+mysql_socket_redhat: "/var/lib/mysql/mysql.sock"
+mysql_config_file_debian: "/etc/mysql/mysql.conf.d/mysqld.cnf"
+mysql_config_file_redhat: "/etc/my.cnf"

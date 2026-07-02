@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    mysql_root_password: "MoleculeRootPass123!"
+    # Explicitly enable remote access so the bind-address / remote-user code
+    # paths are exercised — the role default is secure (localhost only).
+    mysql_enable_remote_network_access: true
+    mysql_bind_address: "0.0.0.0"
+    mysql_manage_remote_user: true
+    mysql_remote_username: "molecule"
+    mysql_remote_pass: "MoleculeRemotePass123!"
+  roles:
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"

@@ -1,0 +1,72 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Stat root mysql client config
+      ansible.builtin.stat:
+        path: /root/.my.cnf
+      register: root_my_cnf
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Set expected MySQL service name for host
+      ansible.builtin.set_fact:
+        mysql_expected_service: >-
+          {{
+            (mysql_service_name_debian | default('mysql'))
+            if ansible_facts['os_family'] | lower == 'debian'
+            else (mysql_service_name_redhat | default('mysqld'))
+          }}.service
+
+    - name: Resolve config file path for host
+      ansible.builtin.set_fact:
+        mysql_expected_config: >-
+          {{
+            (mysql_config_file_debian | default('/etc/mysql/mysql.conf.d/mysqld.cnf'))
+            if ansible_facts['os_family'] | lower == 'debian'
+            else (mysql_config_file_redhat | default('/etc/my.cnf'))
+          }}
+
+    - name: Stat config file
+      ansible.builtin.stat:
+        path: "{{ mysql_expected_config }}"
+      register: mysql_config_file_stat
+
+    - name: Read config file when present
+      ansible.builtin.slurp:
+        src: "{{ mysql_expected_config }}"
+      register: mysql_config
+      when: mysql_config_file_stat.stat.exists
+
+    - name: Assert root client config and running service
+      ansible.builtin.assert:
+        that:
+          - root_my_cnf.stat.exists
+          - root_my_cnf.stat.mode == "0600"
+          - mysql_expected_service in ansible_facts.services
+          - ansible_facts.services[mysql_expected_service].state == "running"
+
+    - name: Assert bind-address was configured for remote access
+      ansible.builtin.assert:
+        that:
+          - "'bind-address = 0.0.0.0' in (mysql_config.content | b64decode)"
+      when: mysql_config_file_stat.stat.exists
+
+    - name: Query the remote account exists
+      community.mysql.mysql_query:
+        login_unix_socket: >-
+          {{
+            mysql_socket_debian
+            if ansible_facts['os_family'] | lower == 'debian'
+            else mysql_socket_redhat
+          }}
+        query: "SELECT User FROM mysql.user WHERE User = 'molecule'"
+      register: mysql_remote_check
+
+    - name: Assert remote account was created
+      ansible.builtin.assert:
+        that:
+          - mysql_remote_check.rowcount[0] | int >= 1
+        fail_msg: "Remote user 'molecule' was not created"

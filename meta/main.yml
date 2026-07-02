@@ -1,0 +1,29 @@
+---
+galaxy_info:
+  role_name: mysql
+  author: rnissen
+  description: >-
+    Install and configure MySQL (or MariaDB) on Debian and RedHat family
+    systems, with secure-installation cleanup and optional remote access
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - mysql
+    - mariadb
+    - database
+    - sql
+    - db
+
+dependencies: []

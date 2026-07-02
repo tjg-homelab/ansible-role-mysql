@@ -1,0 +1,17 @@
+---
+- name: Debian | Install MySQL packages
+  become: true
+  ansible.builtin.apt:
+    name:
+      - "{{ mysql_server_package_debian }}"
+      - "{{ mysql_python_package_debian }}"
+    state: present
+    update_cache: true
+  notify: Restart active mysql
+
+- name: Debian | Ensure MySQL is started
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ mysql_service_name_debian }}"
+    state: started
+    enabled: true

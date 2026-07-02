@@ -1,0 +1,54 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  # Debian 12 uses MariaDB (default-mysql-server) — installs cleanly in a
+  # container. Ubuntu 24.04 exercises the real mysql-server package.
+  - name: mysql-debian12
+    image: geerlingguy/docker-debian12-ansible:latest
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    command: /usr/sbin/init
+  - name: mysql-ubuntu2404
+    image: geerlingguy/docker-ubuntu2404-ansible:latest
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    command: /usr/sbin/init
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..
+  config_options:
+    defaults:
+      remote_tmp: /var/tmp/.ansible/tmp
+  inventory:
+    host_vars:
+      mysql-debian12:
+        ansible_user: root
+        ansible_python_interpreter: /usr/bin/python3
+        mysql_server_package_debian: default-mysql-server
+        mysql_service_name_debian: mariadb
+        mysql_config_file_debian: /etc/mysql/mariadb.conf.d/50-server.cnf
+        # MariaDB has no mysqlx listener.
+        mysqlx_bind_address: ""
+      mysql-ubuntu2404:
+        ansible_user: root
+        ansible_python_interpreter: /usr/bin/python3
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - destroy
+    - create
+    - converge
+    - idempotence
+    - verify
+    - destroy

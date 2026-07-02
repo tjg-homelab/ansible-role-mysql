@@ -1,0 +1,156 @@
+---
+- name: Install MySQL on RedHat systems
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_facts["os_family"] | lower == "redhat"
+
+- name: Install MySQL on Debian systems
+  ansible.builtin.include_tasks: debian.yml
+  when: ansible_facts["os_family"] | lower == "debian"
+
+- name: Set MySQL service name for current OS
+  ansible.builtin.set_fact:
+    mysql_service_name: >-
+      {{
+        mysql_service_name_redhat
+        if ansible_facts["os_family"] | lower == "redhat"
+        else mysql_service_name_debian
+      }}
+  when: mysql_service_name is not defined
+
+- name: Set MySQL socket path for current OS
+  ansible.builtin.set_fact:
+    mysql_socket: >-
+      {{
+        mysql_socket_redhat
+        if ansible_facts["os_family"] | lower == "redhat"
+        else mysql_socket_debian
+      }}
+  when: mysql_socket is not defined
+
+- name: Set MySQL config file path for current OS
+  ansible.builtin.set_fact:
+    mysql_config_file: >-
+      {{
+        mysql_config_file_redhat
+        if ansible_facts["os_family"] | lower == "redhat"
+        else mysql_config_file_debian
+      }}
+  when: mysql_config_file is not defined
+
+- name: Validate required MySQL root password
+  ansible.builtin.assert:
+    that:
+      - mysql_root_password is defined
+      - mysql_root_password | length > 0
+    fail_msg: "Set mysql_root_password before running the mysql role."
+
+- name: Ensure root password is set for localhost
+  become: true
+  community.mysql.mysql_user:
+    name: root
+    host: localhost
+    password: "{{ mysql_root_password }}"
+    login_unix_socket: "{{ mysql_socket }}"
+    state: present
+  no_log: true
+
+- name: Set root ~/.my.cnf file
+  become: true
+  ansible.builtin.template:
+    src: dotmy.cnf.j2
+    dest: /root/.my.cnf
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Create remote MySQL account
+  become: true
+  community.mysql.mysql_user:
+    name: "{{ mysql_remote_username }}"
+    host: "{{ mysql_remote_user_host }}"
+    password: "{{ mysql_remote_pass }}"
+    priv: "{{ mysql_remote_user_priv }}"
+    login_unix_socket: "{{ mysql_socket }}"
+    state: present
+  when:
+    - mysql_manage_remote_user
+    - mysql_remote_username is defined
+    - mysql_remote_username | length > 0
+    - mysql_remote_pass is defined
+    - mysql_remote_pass | length > 0
+  no_log: true
+
+- name: Delete anonymous MySQL users
+  become: true
+  community.mysql.mysql_user:
+    name: ""
+    host: "{{ item }}"
+    state: absent
+    login_unix_socket: "{{ mysql_socket }}"
+  loop:
+    - localhost
+    - "{{ ansible_facts['nodename'] }}"
+  when: mysql_manage_secure_installation
+
+- name: Delete hostname-based root MySQL user
+  become: true
+  community.mysql.mysql_user:
+    name: root
+    host: "{{ ansible_facts['nodename'] }}"
+    state: absent
+    login_unix_socket: "{{ mysql_socket }}"
+  when: mysql_manage_secure_installation
+
+- name: Remove MySQL test database
+  become: true
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: "{{ mysql_socket }}"
+  when: mysql_manage_secure_installation
+
+- name: Check if MySQL config file exists
+  become: true
+  ansible.builtin.stat:
+    path: "{{ mysql_config_file }}"
+  register: mysql_config_stat
+
+- name: Configure MySQL port
+  become: true
+  ansible.builtin.lineinfile:
+    path: "{{ mysql_config_file }}"
+    regexp: "^port\\s*="
+    line: "port = {{ mysql_port }}"
+    insertafter: EOF
+  when:
+    - mysql_enable_remote_network_access
+    - mysql_config_stat.stat.exists
+  notify: Restart active mysql
+
+- name: Configure bind-address for external access
+  become: true
+  ansible.builtin.lineinfile:
+    path: "{{ mysql_config_file }}"
+    regexp: "^bind-address\\s*="
+    line: "bind-address = {{ mysql_bind_address }}"
+    insertafter: EOF
+  when:
+    - mysql_enable_remote_network_access
+    - mysql_config_stat.stat.exists
+  notify: Restart active mysql
+
+- name: Configure mysqlx bind-address for external access
+  become: true
+  ansible.builtin.lineinfile:
+    path: "{{ mysql_config_file }}"
+    regexp: "^mysqlx-bind-address\\s*="
+    line: "mysqlx-bind-address = {{ mysqlx_bind_address }}"
+    insertafter: EOF
+  when:
+    - mysql_enable_remote_network_access
+    - mysqlx_bind_address | length > 0
+    - mysql_config_stat.stat.exists
+  notify: Restart active mysql
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

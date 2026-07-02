@@ -1,0 +1,40 @@
+---
+- name: RedHat | Install MySQL community release RPM
+  become: true
+  ansible.builtin.dnf:
+    name: https://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm
+    state: present
+
+- name: RedHat | Disable all MySQL repos by default
+  become: true
+  ansible.builtin.replace:
+    path: /etc/yum.repos.d/mysql-community.repo
+    regexp: "enabled=1"
+    replace: enabled=0
+
+- name: RedHat | Enable MySQL 8 repo
+  become: true
+  ansible.builtin.yum_repository:
+    name: mysql80-community
+    description: MySQL 8.0 Community Server
+    baseurl: "https://repo.mysql.com/yum/mysql-8.0-community/el/{{ ansible_facts['distribution_major_version'] }}/$basearch/"
+    gpgkey: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-mysql-2023"
+    gpgcheck: true
+    enabled: true
+    state: present
+
+- name: RedHat | Install MySQL packages
+  become: true
+  ansible.builtin.dnf:
+    name:
+      - mysql-community-server
+      - python3-PyMySQL
+    state: present
+  notify: Restart active mysql
+
+- name: RedHat | Ensure MySQL is started
+  become: true
+  ansible.builtin.systemd:
+    name: mysqld
+    state: started
+    enabled: true
