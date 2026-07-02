@@ -55,13 +55,11 @@
       when: mysql_config_file_stat.stat.exists
 
     - name: Query the remote account exists
+      # Socket path hardcoded — the role's *_socket_* defaults are not loaded
+      # in this standalone verify play. Both MySQL and MariaDB use this path
+      # on Debian/Ubuntu.
       community.mysql.mysql_query:
-        login_unix_socket: >-
-          {{
-            mysql_socket_debian
-            if ansible_facts['os_family'] | lower == 'debian'
-            else mysql_socket_redhat
-          }}
+        login_unix_socket: /run/mysqld/mysqld.sock
         query: "SELECT User FROM mysql.user WHERE User = 'molecule'"
       register: mysql_remote_check
 
