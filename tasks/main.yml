@@ -46,7 +46,7 @@
 
 - name: Ensure root password is set for localhost
   become: true
-  community.mysql.mysql_user:
+  ansible.mysql.mysql_user:
     name: root
     host: localhost
     password: "{{ mysql_root_password }}"
@@ -65,7 +65,7 @@
 
 - name: Create remote MySQL account
   become: true
-  community.mysql.mysql_user:
+  ansible.mysql.mysql_user:
     name: "{{ mysql_remote_username }}"
     host: "{{ mysql_remote_user_host }}"
     password: "{{ mysql_remote_pass }}"
@@ -82,7 +82,7 @@
 
 - name: Delete anonymous MySQL users
   become: true
-  community.mysql.mysql_user:
+  ansible.mysql.mysql_user:
     name: ""
     host: "{{ item }}"
     state: absent
@@ -94,7 +94,7 @@
 
 - name: Delete hostname-based root MySQL user
   become: true
-  community.mysql.mysql_user:
+  ansible.mysql.mysql_user:
     name: root
     host: "{{ ansible_facts['nodename'] }}"
     state: absent
@@ -103,7 +103,7 @@
 
 - name: Remove MySQL test database
   become: true
-  community.mysql.mysql_db:
+  ansible.mysql.mysql_db:
     name: test
     state: absent
     login_unix_socket: "{{ mysql_socket }}"

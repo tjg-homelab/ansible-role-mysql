@@ -19,7 +19,7 @@ MySQL "listen everywhere" configuration by design.
 ## Requirements
 
 - Debian 12/13, Ubuntu 22.04/24.04, or Enterprise Linux 9
-- The `community.mysql` collection (`ansible-galaxy collection install community.mysql`)
+- The `ansible.mysql` collection (`ansible-galaxy collection install ansible.mysql`)
 - `mysql_root_password` must be supplied — store it in Ansible Vault
 
 ## Role Variables
@@ -88,7 +88,7 @@ root client config, running service, bind configuration, and remote account.
 
 ```bash
 pip install ansible-core molecule molecule-plugins[docker] docker
-ansible-galaxy collection install community.docker community.mysql ansible.posix
+ansible-galaxy collection install community.docker ansible.mysql ansible.posix
 molecule test
 ```
 
