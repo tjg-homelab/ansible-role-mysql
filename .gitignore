@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .cache/
 .molecule/
+
+# ansible-lint runtime artifact — an absolute-path symlink that makes
+# `ansible-galaxy install` reject the tarball.
+.ansible/
