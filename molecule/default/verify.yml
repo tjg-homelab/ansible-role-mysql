@@ -68,3 +68,49 @@
         that:
           - mysql_remote_check.rowcount[0] | int >= 1
         fail_msg: "Remote user 'molecule' was not created"
+
+    # --- AN-44: databases and users actually exist and can connect ---
+    - name: List databases
+      ansible.builtin.command: mysql -N -B -e "SHOW DATABASES;"
+      register: mysql_verify_dbs
+      changed_when: false
+
+    - name: Assert both application databases were created
+      ansible.builtin.assert:
+        that:
+          - "'molecule_app' in mysql_verify_dbs.stdout_lines"
+          - "'molecule_legacy' in mysql_verify_dbs.stdout_lines"
+        quiet: true
+
+    - name: Read the users and their auth plugins
+      ansible.builtin.command: >-
+        mysql -N -B -e "SELECT CONCAT(user,'@',host,':',plugin) FROM mysql.user
+        WHERE user IN ('molecule_app','molecule_legacy');"
+      register: mysql_verify_users
+      changed_when: false
+
+    - name: Assert users exist on localhost with the requested plugin
+      # The plugin assertion is the point: a user created with the server
+      # default authenticates fine from the mysql CLI and fails from an old
+      # client, which is exactly how a "healthy" server serves a broken app.
+      ansible.builtin.assert:
+        that:
+          - "'molecule_app@localhost:' in mysql_verify_users.stdout"
+          - "'molecule_legacy@localhost:mysql_native_password' in mysql_verify_users.stdout"
+        fail_msg: "users/plugins wrong: {{ mysql_verify_users.stdout }}"
+        quiet: true
+
+    - name: Prove the app user can actually connect and use its database
+      # Creating a user and granting on a database are separate things; only a
+      # real connection proves the grant landed.
+      ansible.builtin.command: >-
+        mysql -u molecule_app -pmolecule-app-pw molecule_app -N -B -e "SELECT 1;"
+      register: mysql_verify_conn
+      changed_when: false
+      no_log: true
+
+    - name: Assert the connection succeeded
+      ansible.builtin.assert:
+        that:
+          - mysql_verify_conn.rc == 0
+        quiet: true
