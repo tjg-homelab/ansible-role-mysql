@@ -37,3 +37,25 @@ mysql_socket_debian: "/var/run/mysqld/mysqld.sock"
 mysql_socket_redhat: "/var/lib/mysql/mysql.sock"
 mysql_config_file_debian: "/etc/mysql/mysql.conf.d/mysqld.cnf"
 mysql_config_file_redhat: "/etc/my.cnf"
+
+# ---------- Application databases and users ----------
+# Both ship EMPTY, like users_list in the users role: the role provisions the
+# SERVER, consumers declare what runs on it.
+#
+# The split this draws is deliberate — Ansible creates empty databases plus
+# users and grants; restoring DATA stays a separate operation. A mysqldump
+# carries schema and rows but NOT users or grants (those live in mysql.user),
+# so a restore alone never leaves an application able to connect.
+#
+# mysql_databases: list of { name, [encoding], [collation], [state] }
+mysql_databases: []
+
+# mysql_users: list of { name, password, [host], [priv], [plugin], [state] }
+#   host    defaults to localhost — keep it that way unless something genuinely
+#           connects over the network; this role binds loopback by default.
+#   priv    e.g. "paxrp322.*:ALL"
+#   plugin  set mysql_native_password for clients too old for MySQL 8's
+#           caching_sha2_password (php 5.6's mysqli, for instance). Leaving it
+#           unset on such a client produces an app that cannot authenticate
+#           while the server looks perfectly healthy.
+mysql_users: []

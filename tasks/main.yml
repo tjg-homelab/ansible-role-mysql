@@ -152,5 +152,43 @@
     - mysql_config_stat.stat.exists
   notify: Restart active mysql
 
+# ---------- Application databases and users ----------
+# Databases first: a grant naming a database that does not exist is accepted by
+# MySQL but the app still fails, so create the target before granting on it.
+- name: Create application databases
+  become: true
+  ansible.mysql.mysql_db:
+    name: "{{ item.name }}"
+    encoding: "{{ item.encoding | default('utf8mb4') }}"
+    collation: "{{ item.collation | default('utf8mb4_general_ci') }}"
+    state: "{{ item.state | default('present') }}"
+    login_unix_socket: "{{ mysql_socket }}"
+  loop: "{{ mysql_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create application users
+  become: true
+  ansible.mysql.mysql_user:
+    name: "{{ item.name }}"
+    host: "{{ item.host | default('localhost') }}"
+    password: "{{ item.password | default(omit) }}"
+    priv: "{{ item.priv | default(omit) }}"
+    plugin: "{{ item.plugin | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    # Only set the password when the user is CREATED. Without this the module
+    # rewrites the credential on every converge — it cannot compare a plaintext
+    # password against the stored hash, so it assumes a change and the role is
+    # never idempotent. `always` is available per-user for a deliberate rotation.
+    update_password: "{{ item.update_password | default('on_create') }}"
+    login_unix_socket: "{{ mysql_socket }}"
+  loop: "{{ mysql_users }}"
+  loop_control:
+    label: "{{ item.name }}@{{ item.host | default('localhost') }}"
+  # The item carries a password; without this the whole dict is echoed in the
+  # task result and the default callback prints it (see the same class of leak
+  # fixed in container-deploy).
+  no_log: true
+
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
