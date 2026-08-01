@@ -175,8 +175,12 @@
     password: "{{ item.password | default(omit) }}"
     priv: "{{ item.priv | default(omit) }}"
     plugin: "{{ item.plugin | default(omit) }}"
-    plugin_auth_string: "{{ item.password | default(omit) if item.plugin is defined else omit }}"
     state: "{{ item.state | default('present') }}"
+    # Only set the password when the user is CREATED. Without this the module
+    # rewrites the credential on every converge — it cannot compare a plaintext
+    # password against the stored hash, so it assumes a change and the role is
+    # never idempotent. `always` is available per-user for a deliberate rotation.
+    update_password: "{{ item.update_password | default('on_create') }}"
     login_unix_socket: "{{ mysql_socket }}"
   loop: "{{ mysql_users }}"
   loop_control:
