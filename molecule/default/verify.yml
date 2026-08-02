@@ -136,27 +136,33 @@
           {{ mysql_verify_charset.stdout }}
         quiet: true
 
-    - name: Stat the drop-in and the packaged config
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      loop:
-        - /etc/mysql/mysql.conf.d/zz-ansible-extra.cnf
-        - /etc/mysql/mysql.conf.d/mysqld.cnf
-      register: mysql_verify_dropin
+    - name: Locate the drop-in wherever the role put it
+      # NOT a hardcoded path. Debian's mysql-server is a virtual package
+      # satisfied by MariaDB, which uses /etc/mysql/mariadb.conf.d and has no
+      # /etc/mysql/mysql.conf.d at all; Ubuntu's Oracle MySQL is the reverse.
+      # Asserting one fixed path passes on one platform and fails on the other
+      # for a reason that has nothing to do with the feature.
+      ansible.builtin.find:
+        paths:
+          - /etc/mysql/mariadb.conf.d
+          - /etc/mysql/mysql.conf.d
+          - /etc/my.cnf.d
+        patterns: "zz-ansible-extra.cnf"
+        file_type: file
+      register: mysql_verify_dropin_find
 
-    - name: Assert the drop-in exists and the packaged config was not touched
-      # Writing into the distro's own mysqld.cnf is what this mechanism exists
-      # to avoid: it makes dpkg -V report a modified conffile and fights the
-      # package on upgrade.
+    - name: Assert exactly one drop-in was written
       ansible.builtin.assert:
         that:
-          - mysql_verify_dropin.results[0].stat.exists
-          - mysql_verify_dropin.results[1].stat.exists
+          - mysql_verify_dropin_find.files | length == 1
+        fail_msg: >-
+          Expected exactly one zz-ansible-extra.cnf, found
+          {{ mysql_verify_dropin_find.files | map(attribute='path') | list }}
         quiet: true
 
     - name: Read the rendered drop-in
       ansible.builtin.slurp:
-        src: /etc/mysql/mysql.conf.d/zz-ansible-extra.cnf
+        src: "{{ mysql_verify_dropin_find.files[0].path }}"
       register: mysql_verify_dropin_content
 
     - name: Assert the drop-in carries a [mysqld] section and the options

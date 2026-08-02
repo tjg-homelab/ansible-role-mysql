@@ -51,8 +51,22 @@ mysql_config_file_redhat: "/etc/my.cnf"
 #
 # Set to {} (the default) and the drop-in is removed.
 mysql_extra_config: {}
-mysql_extra_config_file_debian: "/etc/mysql/mysql.conf.d/zz-ansible-extra.cnf"
-mysql_extra_config_file_redhat: "/etc/my.cnf.d/zz-ansible-extra.cnf"
+
+# Candidate drop-in directories, tried IN ORDER; the first that exists wins.
+# The directory cannot be assumed from os_family: Debian's `mysql-server` is a
+# virtual package satisfied by MariaDB, which ships /etc/mysql/mariadb.conf.d
+# and NO /etc/mysql/mysql.conf.d, while Ubuntu's Oracle MySQL is the reverse.
+#
+# mariadb.conf.d is tried first deliberately. On Debian BOTH /etc/mysql/conf.d
+# and mariadb.conf.d exist, but conf.d is included FIRST in my.cnf — and MySQL
+# lets the last value read win, so a drop-in in conf.d would be overridden by
+# the packaged config it is supposed to override.
+#
+# Set mysql_extra_config_file directly to bypass discovery entirely.
+mysql_extra_config_dirs:
+  - /etc/mysql/mariadb.conf.d   # Debian: mysql-server -> MariaDB
+  - /etc/mysql/mysql.conf.d     # Ubuntu / Oracle MySQL
+  - /etc/my.cnf.d               # RHEL family
 
 # ---------- Application databases and users ----------
 # Both ship EMPTY, like users_list in the users role: the role provisions the

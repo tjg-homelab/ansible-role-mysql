@@ -37,15 +37,40 @@
       }}
   when: mysql_config_file is not defined
 
-- name: Set MySQL extra-config drop-in path for current OS
-  ansible.builtin.set_fact:
-    mysql_extra_config_file: >-
-      {{
-        mysql_extra_config_file_redhat
-        if ansible_facts["os_family"] | lower == "redhat"
-        else mysql_extra_config_file_debian
-      }}
+- name: Find the MySQL drop-in directory
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ mysql_extra_config_dirs }}"
+  register: mysql_extra_config_dir_stat
   when: mysql_extra_config_file is not defined
+
+- name: Set the MySQL extra-config drop-in path
+  ansible.builtin.set_fact:
+    mysql_extra_config_file: "{{ found | first }}/zz-ansible-extra.cnf"
+  vars:
+    found: >-
+      {{ mysql_extra_config_dir_stat.results
+         | selectattr('stat.isdir', 'defined')
+         | selectattr('stat.isdir')
+         | map(attribute='item') | list }}
+  when:
+    - mysql_extra_config_file is not defined
+    - found | length > 0
+
+# Fail rather than skip. A drop-in written somewhere the server never reads is
+# indistinguishable from a working one on disk, so silently doing nothing here
+# would hand back a server that looks configured and is not.
+- name: Assert a drop-in directory was found
+  ansible.builtin.assert:
+    that: mysql_extra_config_file is defined
+    fail_msg: >-
+      mysql_extra_config is set but none of {{ mysql_extra_config_dirs | join(', ') }}
+      exists on this host, so there is nowhere the server would actually read.
+      Set mysql_extra_config_file explicitly, or add the right directory to
+      mysql_extra_config_dirs.
+    quiet: true
+  when: mysql_extra_config | length > 0
 
 - name: Manage the MySQL extra-config drop-in
   become: true
@@ -63,7 +88,9 @@
   ansible.builtin.file:
     path: "{{ mysql_extra_config_file }}"
     state: absent
-  when: mysql_extra_config | length == 0
+  when:
+    - mysql_extra_config | length == 0
+    - mysql_extra_config_file is defined
   notify: Restart active mysql
 
 - name: Validate required MySQL root password
