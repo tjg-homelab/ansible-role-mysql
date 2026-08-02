@@ -38,6 +38,36 @@ mysql_socket_redhat: "/var/lib/mysql/mysql.sock"
 mysql_config_file_debian: "/etc/mysql/mysql.conf.d/mysqld.cnf"
 mysql_config_file_redhat: "/etc/my.cnf"
 
+# --- Extra server configuration ----------------------------------------------
+# Arbitrary [mysqld] options, as a dict of option -> value. Rendered to a
+# DROP-IN file rather than edited into the packaged config, so the distro's own
+# mysqld.cnf stays pristine (a package upgrade can still ship new defaults, and
+# `dpkg -V` does not report the file as modified). The filename sorts last, so
+# these win over anything the package sets.
+#
+#   mysql_extra_config:
+#     character-set-server: utf8mb4
+#     max_connections: 200
+#
+# Set to {} (the default) and the drop-in is removed.
+mysql_extra_config: {}
+
+# Candidate drop-in directories, tried IN ORDER; the first that exists wins.
+# The directory cannot be assumed from os_family: Debian's `mysql-server` is a
+# virtual package satisfied by MariaDB, which ships /etc/mysql/mariadb.conf.d
+# and NO /etc/mysql/mysql.conf.d, while Ubuntu's Oracle MySQL is the reverse.
+#
+# mariadb.conf.d is tried first deliberately. On Debian BOTH /etc/mysql/conf.d
+# and mariadb.conf.d exist, but conf.d is included FIRST in my.cnf — and MySQL
+# lets the last value read win, so a drop-in in conf.d would be overridden by
+# the packaged config it is supposed to override.
+#
+# Set mysql_extra_config_file directly to bypass discovery entirely.
+mysql_extra_config_dirs:
+  - /etc/mysql/mariadb.conf.d   # Debian: mysql-server -> MariaDB
+  - /etc/mysql/mysql.conf.d     # Ubuntu / Oracle MySQL
+  - /etc/my.cnf.d               # RHEL family
+
 # ---------- Application databases and users ----------
 # Both ship EMPTY, like users_list in the users role: the role provisions the
 # SERVER, consumers declare what runs on it.

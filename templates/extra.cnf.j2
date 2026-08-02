@@ -1,0 +1,7 @@
+{{ ansible_managed | comment }}
+# Drop-in rendered from mysql_extra_config. The packaged mysqld.cnf is left
+# untouched; this file sorts last in the includedir so these options win.
+[mysqld]
+{% for option, value in mysql_extra_config | dictsort %}
+{{ option }} = {{ value }}
+{% endfor %}

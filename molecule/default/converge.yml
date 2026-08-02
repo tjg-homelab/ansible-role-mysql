@@ -11,5 +11,11 @@
     mysql_manage_remote_user: true
     mysql_remote_username: "molecule"
     mysql_remote_pass: "MoleculeRemotePass123!"
+    # The charset/collation pair a legacy client needs. Asserted against the
+    # LIVE server, not the file — a drop-in that is written but not read (wrong
+    # path, wrong section, not in an includedir) looks identical on disk.
+    mysql_extra_config:
+      character-set-server: utf8mb4
+      collation-server: utf8mb4_general_ci
   roles:
     - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
