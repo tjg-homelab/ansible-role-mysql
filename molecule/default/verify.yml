@@ -114,3 +114,58 @@
         that:
           - mysql_verify_conn.rc == 0
         quiet: true
+
+    # --- AN-47: extra-config drop-in ---
+    # The failure this guards against is a drop-in that exists on disk but is
+    # never read (wrong directory, wrong section header, outside the
+    # includedir). That is indistinguishable from a working one by stat/slurp,
+    # so the assertion is against the RUNNING server's variables.
+    - name: Read the effective server charset and collation
+      ansible.builtin.command: >-
+        mysql -N -B -e "SELECT @@character_set_server, @@collation_server;"
+      register: mysql_verify_charset
+      changed_when: false
+
+    - name: Assert mysql_extra_config reached the running server
+      ansible.builtin.assert:
+        that:
+          - "'utf8mb4' in mysql_verify_charset.stdout"
+          - "'utf8mb4_general_ci' in mysql_verify_charset.stdout"
+        fail_msg: >-
+          Drop-in not in effect. Server reports:
+          {{ mysql_verify_charset.stdout }}
+        quiet: true
+
+    - name: Stat the drop-in and the packaged config
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/mysql/mysql.conf.d/zz-ansible-extra.cnf
+        - /etc/mysql/mysql.conf.d/mysqld.cnf
+      register: mysql_verify_dropin
+
+    - name: Assert the drop-in exists and the packaged config was not touched
+      # Writing into the distro's own mysqld.cnf is what this mechanism exists
+      # to avoid: it makes dpkg -V report a modified conffile and fights the
+      # package on upgrade.
+      ansible.builtin.assert:
+        that:
+          - mysql_verify_dropin.results[0].stat.exists
+          - mysql_verify_dropin.results[1].stat.exists
+        quiet: true
+
+    - name: Read the rendered drop-in
+      ansible.builtin.slurp:
+        src: /etc/mysql/mysql.conf.d/zz-ansible-extra.cnf
+      register: mysql_verify_dropin_content
+
+    - name: Assert the drop-in carries a [mysqld] section and the options
+      ansible.builtin.assert:
+        that:
+          - "'[mysqld]' in dropin"
+          - "'character-set-server = utf8mb4' in dropin"
+          - "'collation-server = utf8mb4_general_ci' in dropin"
+        fail_msg: "Rendered drop-in:\n{{ dropin }}"
+        quiet: true
+      vars:
+        dropin: "{{ mysql_verify_dropin_content.content | b64decode }}"

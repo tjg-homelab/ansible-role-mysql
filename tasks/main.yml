@@ -37,6 +37,35 @@
       }}
   when: mysql_config_file is not defined
 
+- name: Set MySQL extra-config drop-in path for current OS
+  ansible.builtin.set_fact:
+    mysql_extra_config_file: >-
+      {{
+        mysql_extra_config_file_redhat
+        if ansible_facts["os_family"] | lower == "redhat"
+        else mysql_extra_config_file_debian
+      }}
+  when: mysql_extra_config_file is not defined
+
+- name: Manage the MySQL extra-config drop-in
+  become: true
+  ansible.builtin.template:
+    src: extra.cnf.j2
+    dest: "{{ mysql_extra_config_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: mysql_extra_config | length > 0
+  notify: Restart active mysql
+
+- name: Remove the MySQL extra-config drop-in when empty
+  become: true
+  ansible.builtin.file:
+    path: "{{ mysql_extra_config_file }}"
+    state: absent
+  when: mysql_extra_config | length == 0
+  notify: Restart active mysql
+
 - name: Validate required MySQL root password
   ansible.builtin.assert:
     that:
